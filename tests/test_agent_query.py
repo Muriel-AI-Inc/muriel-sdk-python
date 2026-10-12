@@ -156,6 +156,21 @@ def test_module_level_query_takes_an_api_key():
         agent_mod._agents.clear()
 
 
+def test_out_of_credits_reports_the_balance():
+    a = _agent()
+    body = {"detail": {"error": "out_of_credits", "message": "You are out of credits.",
+                       "balance": 0, "contact": "info@murielai.io"}}
+    a._session.post = lambda url, json=None, timeout=None, **kw: _Resp(body, 402)
+    try:
+        a.query("x")
+        raise AssertionError("expected MurielCreditsError")
+    except Exception as e:
+        from muriel import MurielCreditsError
+        assert isinstance(e, MurielCreditsError)
+        assert e.balance == 0 and "(balance: 0)" in str(e)
+        assert e.buy_url.startswith("mailto:info@murielai.io")
+
+
 def test_every_error_status_raises_its_own_exception():
     from muriel.exceptions import (MurielAuthenticationError, MurielCreditsError,
                                    MurielRateLimitError, MurielServerError)
@@ -172,7 +187,10 @@ def test_every_error_status_raises_its_own_exception():
         except exc as e:
             assert type(e) is exc, f"{status}: got {type(e).__name__}"
             assert e.status_code == status
-            if status in (402, 429, 500, 503):
+            if status == 402:
+                assert str(e).startswith("Out of Muriel API credits")
+                assert "info@murielai.io" in str(e) and e.server_message == "server says 402"
+            elif status in (429, 500, 503):
                 assert "server says" in str(e), f"{status}: server detail lost"
 
 

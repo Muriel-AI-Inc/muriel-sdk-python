@@ -261,8 +261,8 @@ from muriel import MurielAPIError, MurielCreditsError, get_results
 
 try:
     rows = get_results(pwsid="IL0316000")
-except MurielCreditsError:
-    print("Out of credits.")
+except MurielCreditsError as e:
+    print(e)   # "Out of Muriel API credits ... To buy more credits, email info@murielai.io ..."
 except MurielAPIError as e:
     print(e.status_code, e.message)
 ```
@@ -271,7 +271,7 @@ except MurielAPIError as e:
 |---|---|
 | `MurielAuthenticationError` | Missing or invalid API key (401) |
 | `MurielValidationError` | A bad parameter (400) |
-| `MurielCreditsError` | Out of credits (402); nothing was charged |
+| `MurielCreditsError` | Out of API credits (402). The call was not run and nothing was charged; the message says how to buy more (email info@murielai.io). `e.balance` has the balance when known |
 | `MurielNotFoundError` | Unknown system or resource (404) |
 | `MurielRateLimitError` | Too many requests (429); wait and retry |
 | `MurielServerError` | Not available (501), or a server error worth retrying (5xx) |

@@ -108,7 +108,7 @@ class MurielClient:
                 )
             elif response.status_code == 402:
                 raise MurielCreditsError(
-                    detail_of(response, "Out of credits. Email info@murielai.io to add more."),
+                    detail_of(response, ""),
                     status_code=402,
                     response=response.json() if response.content else None,
                 )

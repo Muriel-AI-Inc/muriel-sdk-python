@@ -98,7 +98,11 @@ def test_out_of_credits_is_a_credits_error_with_the_server_message():
         get_results(pwsid="IL0316000", api_key=KEY)
         raise AssertionError("expected MurielCreditsError")
     except MurielCreditsError as exc:
-        assert exc.status_code == 402 and "1,000 records" in str(exc)
+        msg = str(exc)
+        assert exc.status_code == 402
+        assert msg.startswith("Out of Muriel API credits") and "buy more credits" in msg
+        assert "info@murielai.io" in msg and "nothing was charged" in msg
+        assert "1,000 records" in exc.server_message
     finally:
         NEXT["resp"] = _Resp()
 

@@ -29,16 +29,39 @@ class MurielNotFoundError(MurielAPIError):
     pass
 
 
+BUY_CREDITS_EMAIL = "info@murielai.io"
+ACCOUNT_URL = "https://murielai.io/account"
+
+
 class MurielCreditsError(MurielAPIError):
-    """HTTP 402: the key's account is out of credits.
+    """HTTP 402: the account is out of Muriel API credits and needs more.
 
     Raised before the call runs -- an agent question or a data call alike --
-    so nothing was charged. Agent questions are metered per question; data
-    calls cost 1 credit per 1,000 records returned. Email info@murielai.io
-    for more credits; the free allowance renews monthly.
+    so nothing was charged. The message always says so, plainly, and says how
+    to buy more; the server's own wording is kept in `server_message`.
+
+    Attributes:
+        balance: the account's credit balance, when the server reported it.
+        buy_url: where to buy more credits (an email link).
+        account_url: the account page, which shows the balance.
+        server_message: the server's explanation, verbatim.
     """
 
-    pass
+    def __init__(self, message: str = None, status_code: int = 402,
+                 response: dict = None):
+        detail = (response or {}).get("detail") if isinstance(response, dict) else None
+        self.balance = detail.get("balance") if isinstance(detail, dict) else None
+        self.server_message = message
+        self.buy_url = f"mailto:{BUY_CREDITS_EMAIL}?subject=Muriel%20credits"
+        self.account_url = ACCOUNT_URL
+        bal = f" (balance: {self.balance})" if self.balance is not None else ""
+        text = (
+            f"Out of Muriel API credits{bal}. This call was not run and nothing "
+            f"was charged. To buy more credits, email {BUY_CREDITS_EMAIL} or use "
+            f"'Need more credits' on your account page ({ACCOUNT_URL}). "
+            f"Free accounts get 8 credits a month."
+        )
+        super().__init__(text, status_code=status_code, response=response)
 
 
 class MurielRateLimitError(MurielAPIError):
