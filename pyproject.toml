@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "muriel"
+version = "0.2.0"
+description = "Muriel: ask the U.S. drinking water record in plain English (agent-first SDK)"
+readme = "README.md"
+authors = [
+    {name = "Muriel AI, Inc.", email = "info@murielai.io"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Typing :: Typed",
+]
+keywords = ["water", "quality", "api", "pfas", "lead", "contaminants", "environmental"]
+dependencies = [
+    "requests>=2.31.0",
+    "pydantic>=2.0.0",
+]
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "flake8>=6.0.0",
+]
+
+[project.urls]
+Homepage = "https://murielai.io/developers"
+Documentation = "https://docs.murielai.io"
+"API reference" = "https://api.murielai.io/docs"
+Repository = "https://github.com/Muriel-AI-Inc/muriel-sdk-python"
+"Bug Tracker" = "https://github.com/Muriel-AI-Inc/muriel-sdk-python/issues"
+
+# Only the library ships: tests/, examples/ and tools/ stay in the repo.
+[tool.setuptools.packages.find]
+include = ["muriel*"]
+
+[tool.setuptools.package-data]
+muriel = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
