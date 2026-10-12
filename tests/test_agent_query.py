@@ -156,6 +156,26 @@ def test_module_level_query_takes_an_api_key():
         agent_mod._agents.clear()
 
 
+def test_every_error_status_raises_its_own_exception():
+    from muriel.exceptions import (MurielAuthenticationError, MurielCreditsError,
+                                   MurielRateLimitError, MurielServerError)
+    cases = [(400, MurielValidationError), (401, MurielAuthenticationError),
+             (402, MurielCreditsError), (429, MurielRateLimitError),
+             (500, MurielServerError), (503, MurielServerError), (418, MurielAPIError)]
+    for status, exc in cases:
+        a = _agent()
+        body = {"detail": f"server says {status}"}
+        a._session.post = lambda url, json=None, timeout=None, _b=body, _s=status, **kw: _Resp(_b, _s)
+        try:
+            a.query("x")
+            raise AssertionError(f"{status}: expected {exc.__name__}")
+        except exc as e:
+            assert type(e) is exc, f"{status}: got {type(e).__name__}"
+            assert e.status_code == status
+            if status in (402, 429, 500, 503):
+                assert "server says" in str(e), f"{status}: server detail lost"
+
+
 if __name__ == "__main__":
     n = 0
     for name, fn in sorted(globals().items()):

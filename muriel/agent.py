@@ -16,9 +16,11 @@ from .config import DEFAULT_TIMEOUT, checked_base_url, get_api_key, get_base_url
 from .exceptions import (
     MurielAPIError,
     MurielAuthenticationError,
+    MurielCreditsError,
     MurielRateLimitError,
     MurielServerError,
     MurielValidationError,
+    detail_of,
 )
 from .models import AgentQueryResponse
 
