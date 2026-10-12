@@ -109,8 +109,8 @@ answer = muriel.query("Is Chicago's water meeting federal limits for lead and co
 
 print(answer.summary)                 # the answer, in plain English
 for r in answer.results[:5]:          # the records it rests on
-    print(r["sample_collection_date"], r["system_name"],
-          r["result_analyte_name"], r["result_value"], r["result_unit"])
+    print(r.get("sample_collection_date"), r.get("system_name"),
+          r.get("result_analyte_name"), r.get("result_value"), r.get("result_unit"))
 ```
 
 `muriel.query()` asks the same agent that answers at
@@ -122,7 +122,7 @@ Each answer carries:
 | Field | What it holds |
 |---|---|
 | `summary` | The answer in plain English |
-| `results`, `count` | The records the answer rests on |
+| `results`, `count` | The records the answer rests on. Sample results use the same fields as the REST API's records; other rows, such as events or rankings, have their own, so read them with `.get()` |
 | `documents` | Any CSV or PDF the agent produced, with a download URL |
 | `warning` | A caveat, when the data needs one |
 | `execution_log` | The steps the agent took |
