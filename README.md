@@ -1,11 +1,53 @@
 # Muriel Python SDK
 
-Ask about any U.S. public water system in plain English, from Python. Get the
-answer, the records behind it, and the date each state's data stops.
+`muriel` is the official Python package for [Muriel](https://murielai.io), the
+AI agent for U.S. drinking water data. It gives your code the same two things
+the Muriel app gives a person: answers to plain-English questions about any
+public water system, and direct access to the sample results those answers are
+built from.
 
 ```bash
 pip install muriel
 ```
+
+## What this package does
+
+**It puts the Muriel agent in your code.** `muriel.query("...")` sends a
+question to the same agent that answers at murielai.io. The agent works out
+which systems, contaminants and dates the question is about, pulls the
+results, checks them against federal limits (MCLs, action levels, treatment
+rules), and returns:
+
+- a plain-English answer,
+- the records it used, as a list you can loop over,
+- any CSV or PDF it produced when you asked for one,
+- a caveat when the data needs one, such as a state that has stopped updating,
+- and what the question cost.
+
+Give it a JSON schema, a list of field names or a Pydantic model, and the
+answer comes back in exactly that shape, ready for a database, a dashboard or
+another program. Scope any question to one water system (`pwsid=`) or a start
+date (`since=`).
+
+**It gives you the data directly, too.** When you already know what you want,
+such as one system's full history, one contaminant across the country, every
+water system in a state, or the results for the system serving an address,
+functions like `get_results()`, `get_lead()` and `get_systems()` return the
+records themselves, with filters for dates, detections, concentrations and
+contaminant groups, and paging for large pulls. Every record has the same
+fields whichever state it came from, with values as published and converted
+to mg/L so they compare across states.
+
+**One key, one balance, plain Python.** Both halves use the same API key and
+the same credits as your Muriel account. Results come back as ordinary
+dictionaries and lists, or as typed Pydantic models for agent answers. Errors
+are typed exceptions you can catch, such as out of credits, an invalid key or
+a bad parameter, each with the server's explanation. Keys are only ever sent
+over HTTPS and never forwarded on a redirect.
+
+Use the agent for questions, summaries, comparisons and anything you would
+otherwise ask an analyst. Use the direct functions for repeatable pipelines,
+bulk pulls and exact filters.
 
 ## What Muriel is
 
