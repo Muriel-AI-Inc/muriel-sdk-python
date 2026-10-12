@@ -1,268 +1,216 @@
 # Muriel Python SDK
 
-Official Python SDK for the Muriel® Water Quality API.
-
-## Installation
+Ask about any U.S. public water system in plain English, from Python. Get the
+answer, the records behind it, and the date each state's data stops.
 
 ```bash
 pip install muriel
 ```
 
-## Quick start: ask the agent
+## What Muriel is
 
-Get an API key at https://murielai.io/account, then:
+Muriel reads the drinking water monitoring results states publish, standardized
+into one record, and checks them against federal limits. Every answer is built
+from the sample results themselves, not from summaries or annual reports, and
+shows its work: the rows it used and how current each state is. A gap is never
+passed off as a clean record.
+
+- **88 million+ results** from **32 states** and **63,000+ water systems**
+- **Current:** many states update daily, often within days of sampling
+- **Deep:** some states go back to the 1970s
+- **Every contaminant states test for:** lead and copper, PFAS, nitrate,
+  disinfection byproducts, arsenic, coliform, VOCs and more
+
+See exactly which states, contaminants and years are covered, live, at
+[murielai.io/overview](https://murielai.io/overview).
+
+It is built for people who work with drinking water: utilities and the
+regulators who oversee them, and the labs, engineering firms and vendors who
+serve them.
+
+## Get a key
+
+Create an API key on your [account page](https://murielai.io/account), then:
 
 ```bash
 export MURIEL_API_KEY="muriel_live_..."
 ```
 
+Every function reads `MURIEL_API_KEY`; you can also pass `api_key=` directly.
+
+## Ask the agent
+
 ```python
 import muriel
 
-answer = muriel.query("Show me the latest lead samples in Illinois")
-print(answer.summary)                 # the agent's answer
-for r in answer.results[:5]:          # the records it rests on
-    print(r["sample_collection_date"], r["system_name"], r["result_value"], r["result_unit"])
+answer = muriel.query("Is Chicago's water meeting federal limits for lead and copper?")
 
-# Scope it and shape it
+print(answer.summary)                 # the answer, in plain English
+for r in answer.results[:5]:          # the records it rests on
+    print(r["sample_collection_date"], r["system_name"],
+          r["result_analyte_name"], r["result_value"], r["result_unit"])
+```
+
+The agent is the same one that answers at [murielai.io](https://murielai.io).
+It finds the system, pulls the results, compares them with MCLs, action levels
+and treatment rules, and tells you when a state's data is out of date.
+
+### What you can ask
+
+| | |
+|---|---|
+| **Compliance** | Which systems in Georgia had a nitrate result above the MCL in the last year? |
+| **Trends** | Which systems are within 20% of an MCL and trending up? |
+| **PFAS** | Where has PFOA or PFOS been detected above 4 ppt in Pennsylvania? |
+| **What changed** | What new results were published in California this week? |
+| **Market research** | Which Illinois systems serving over 50,000 people have detected PFAS? |
+
+### Scope it
+
+```python
+answer = muriel.query("Any new detections?", pwsid="IL0316000", since="2026-01-01")
+```
+
+### Get exactly the fields you need
+
+Pass a list of field names, or a Pydantic model, and the answer comes back in
+that shape:
+
+```python
 latest = muriel.query(
-    "What was the most recent lead result for Chicago Water?",
+    "What was the most recent lead result for Chicago?",
     pwsid="IL0316000",
     schema=["sample_date", "result", "units", "above_action_level"],
 )
 ```
 
-One price list covers the app, this SDK and the MCP connector, from one balance of
-credits: an agent question is metered like a question in the app (typically 1-3
-credits, never more than 8), and the traditional functions below cost 1 credit per
-1,000 records returned, added up across calls. Every account gets 8 free credits a
-month. Out of credits raises `muriel.MurielCreditsError` before anything runs.
-
-## Traditional API
-
 ```python
-from muriel import get_results
-
-results = get_results(pwsid="IL0316000", limit=50)            # history included
-recent = get_results(state="IL", limit=100, era="recent")     # current window only
-```
-
-`get_requirements` and `get_violations` return HTTP 501: that data is not in the store yet.
-
-Interactive API reference: https://api.murielai.io/docs. Guides: the muriel-sdk-docs site.
-
-### Agent Mode (Recommended)
-
-Use natural language to query water quality data:
-
-```python
-from muriel import Agent
-
-agent = Agent(api_key='YOUR_API_KEY')
-
-# Query using natural language
-results = agent.query('Tell me where PFAS concentrations are rising')
-
-print(results)
-```
-
-### Query by Address
-
-```python
-from muriel import get_results
-
-# Find water quality data near a specific address
-results = get_results(
-    address='233 S Wacker Dr, Chicago, IL 60606',
-    api_key='YOUR_API_KEY',
-    radius_miles=10
-)
-```
-
-### Filter by Analyte
-
-```python
-from muriel import get_results
-
-# Get lead test results for a water system
-results = get_results(
-    pwsid='IL0316000',
-    api_key='YOUR_API_KEY',
-    analyte='Lead',
-    num=50
-)
-```
-
-### Query by Analyte Group
-
-```python
-from muriel import get_results
-
-# Get all PFAS results
-pfas_results = get_results(
-    api_key='YOUR_API_KEY',
-    analyte_group='pfas',
-    num=100
-)
-```
-
-## Features
-
-- 🔍 **Simple API**: Easy-to-use functions for common queries
-- 🤖 **Agent Mode**: Natural language queries powered by AI
-- 📊 **Structured Data**: Pydantic models for type safety
-- 🗺️ **Geographic Queries**: Search by address or coordinates
-- 🔐 **Secure**: API key authentication
-- ⚡ **Fast**: Efficient HTTP client with connection pooling
-
-## Data Coverage
-
-- **56,180+ Public Water Systems** across 31 states
-- **40+ Million water quality records**
-- **171,073 Sampling points** with geocoding
-- **1,474 Unique analytes** including PFAS, lead, bacteria
-- **20 Analyte groups** (PFAS, metals, microbial, VOCs, etc.)
-
-## Advanced Usage
-
-### Get Facilities with Geocoding
-
-```python
-from muriel import get_state_facilities
-
-facilities = get_state_facilities(
-    state='IL',
-    api_key='YOUR_API_KEY',
-    limit=100
-)
-
-for facility in facilities['facilities']:
-    if facility.get('geocoding'):
-        print(f"{facility['pwsid']}: {facility['geocoding']['address_formatted']}")
-```
-
-### Get Sampling Points
-
-```python
-from muriel import get_state_sampling_points
-
-sampling_points = get_state_sampling_points(
-    state='IL',
-    api_key='YOUR_API_KEY',
-    limit=100
-)
-```
-
-### Agent Mode with Schema
-
-```python
-from muriel import Agent
-from pydantic import BaseModel, Field
 from typing import List
+from pydantic import BaseModel
+from muriel import Agent
 
-agent = Agent(api_key='YOUR_API_KEY')
-
-class WaterQualitySummary(BaseModel):
+class SystemSummary(BaseModel):
     pwsid: str
     system_name: str
     total_samples: int
     contaminants_found: List[str]
 
-result = agent.query(
-    schema=WaterQualitySummary,
-    prompt="Get a summary of water quality for Public Water System IL0316000"
-)
-
-print(f"System: {result.system_name}")
-print(f"Total Samples: {result.total_samples}")
+summary = Agent().query("Summarize water quality for IL0316000.", schema=SystemSummary)
+print(summary.system_name, summary.total_samples)
 ```
 
-## API Reference
+### From question to CSV
 
-### Core Functions
-
-- `get_results()` - Query water quality sample results
-- `get_requirements()` - Sampling requirements by system or state
-- `get_violations()` - Compliance violations by system or state
-- `get_systems()` - List PWSIDs for a state
-- `get_state_facilities()` - Get facilities with geocoding data
-- `get_state_sampling_points()` - Get sampling points with locations
-- `get_facility_geocoding()` - Get geocoding for a specific facility
-- `get_sampling_point_geocoding()` - Get geocoding for a sampling point
-
-### Contaminant Helpers
-
-- `get_latest()`, `get_lead()`, `get_pfas()`, `get_coliform()`, `get_nitrate()`
-- `get_dbps()`, `get_arsenic()`, `get_manganese()`, `get_vocs()`
-
-### Clients
-
-- `RequirementsClient`, `SystemsClient`, `SamplesClient`
-
-### Agent Class
-
-- `Agent(api_key)` - Initialize Agent Mode client
-- `agent.query(prompt, schema=None)` - Natural language query
-
-## Parameters
-
-### `get_results()`
-
-- `pwsid` (str, optional): Public Water System ID
-- `address` (str, optional): Address to search near
-- `state` (str, optional): State abbreviation (e.g., 'IL', 'CA')
-- `analyte` (str, optional): Filter by analyte name (e.g., 'Lead')
-- `analyte_group` (str, optional): Filter by group ('pfas', 'metals_inorganic', etc.)
-- `api_key` (str, required): Your API key
-- `num` (int, optional): Number of results (default: 10, max: 100)
-- `latest` (bool, optional): Sort by most recent (default: True)
-- `start_date` (str, optional): Filter by start date (ISO format)
-- `end_date` (str, optional): Filter by end date (ISO format)
-- `radius_miles` (float, optional): Search radius for address queries (default: 10)
-
-## Environment Variables
-
-You can set your API key as an environment variable:
-
-```bash
-export MURIEL_API_KEY='your-api-key-here'
-```
-
-Then use the SDK without passing the key:
+Ask for an export and the file comes back with the answer:
 
 ```python
-from muriel import get_results
-
-# API key read from environment
-results = get_results(pwsid='IL0316000')
+answer = muriel.query("Which systems in Oregon have a lead 90th percentile above 10 ppb? "
+                      "Export it to a CSV, largest systems first.")
+for doc in answer.documents:
+    print(doc["filename"], doc["url"])
 ```
 
-## Error Handling
+Each answer also carries `execution_log` (the steps the agent took), `warning`
+(when the answer needs a caveat) and `credits` (what the question used).
+
+## Query the data directly
+
+When you know exactly what you want, such as one system's full history or one
+contaminant across the country, call the data directly:
 
 ```python
-from muriel import get_results, MurielAPIError
+from muriel import get_results, get_lead, get_systems
+
+# One water system, history included
+rows = get_results(pwsid="IL0316000", analyte="Lead", limit=100)
+
+# A whole state, or one group of contaminants
+rows = get_results(state="IL", analyte_group="pfas", limit=500)
+
+# The water system that serves an address, then systems nearby
+rows = get_results(address="121 N LaSalle St, Chicago, IL", radius_miles=10)
+
+# The latest lead results nationwide
+rows = get_lead(limit=50, detections_only=True)
+
+# Every water system in a state, with size and latest sample
+systems = get_systems(state="IL")
+```
+
+Every record carries the system, contaminant, value as published, the value in
+mg/L, the sample date and place where known, and `era`: `"recent"` for the
+window states currently publish, `"historical"` for the archive. Pass
+`era="all"` to include history in the national feeds, or `era="recent"` to
+limit a system or state query to current results.
+
+| Function | What it returns |
+|---|---|
+| `get_results()` | Results by system, state, analyte group or address, with filters for dates, detections, concentration and analyte |
+| `get_latest()`, `get_lead()`, `get_pfas()`, `get_coliform()`, `get_nitrate()`, `get_dbps()`, `get_arsenic()`, `get_manganese()`, `get_vocs()` | The latest results for one contaminant, nationwide |
+| `get_systems()` | Water systems in a state |
+| `get_state_sampling_points()`, `get_sampling_point_geocoding()` | Sampling points with a location |
+| `get_state_facilities()`, `get_facility_geocoding()` | Facilities with a location, where states publish them |
+| `SamplesClient`, `SystemsClient` | The same calls as objects |
+
+Up to 1,000 records per call; page with `offset`. Monitoring requirements and
+violation records (`get_requirements`, `get_violations`) are not available yet;
+ask the agent about monitoring gaps and exceedances instead.
+
+## Pricing
+
+One balance of credits covers the app, this SDK and the MCP connector:
+
+- **An agent question** is metered like a question in the app: typically
+  1–3 credits, never more than 8.
+- **A direct data call** costs 1 credit per 1,000 records returned, added up
+  across calls. A call that returns nothing is free.
+
+Every account gets 8 free credits a month. For more, email
+[info@murielai.io](mailto:info@murielai.io).
+
+## Errors
+
+```python
+from muriel import MurielAPIError, MurielCreditsError, get_results
 
 try:
-    results = get_results(
-        pwsid='IL0316000',
-        api_key='YOUR_API_KEY'
-    )
+    rows = get_results(pwsid="IL0316000")
+except MurielCreditsError:
+    print("Out of credits.")
 except MurielAPIError as e:
-    print(f"API Error: {e.message}")
-    print(f"Status Code: {e.status_code}")
+    print(e.status_code, e.message)
 ```
+
+| Exception | When |
+|---|---|
+| `MurielAuthenticationError` | Missing or invalid API key (401) |
+| `MurielValidationError` | A bad parameter (400) |
+| `MurielCreditsError` | Out of credits (402); nothing was charged |
+| `MurielNotFoundError` | Unknown system or resource (404) |
+| `MurielRateLimitError` | Too many requests (429); wait and retry |
+| `MurielServerError` | Not available (501), or a server error worth retrying (5xx) |
+
+All of them inherit from `MurielAPIError`.
+
+## Good to know
+
+Muriel is a research and analysis tool, not a compliance determination.
+Results are as states published them; coverage varies by state, and the
+absence of a result is never evidence of compliance. Only your state primacy
+agency can say whether a system is in compliance.
 
 ## Documentation
 
-- Guides and SDK reference: https://docs.murielai.io
-- API reference (OpenAPI): https://api.murielai.io/docs
+- Guides and SDK reference: [docs.murielai.io](https://docs.murielai.io)
+- API reference: [api.murielai.io/docs](https://api.murielai.io/docs)
+- Use Muriel in Claude, Cursor and other AI tools: [murielai.io/developers](https://murielai.io/developers)
 
 ## Support
 
-- Email: info@murielai.io
-- Issues: https://github.com/Muriel-AI-Inc/muriel-sdk-python/issues
+- Email: [info@murielai.io](mailto:info@murielai.io)
+- Issues: [github.com/Muriel-AI-Inc/muriel-sdk-python/issues](https://github.com/Muriel-AI-Inc/muriel-sdk-python/issues)
 
 ## License
 
-MIT. Copyright (c) 2024-2026 Muriel AI, Inc. Use of the Muriel API itself is
-governed by the terms at https://murielai.io/terms.
+MIT. Copyright (c) 2024-2026 Muriel AI, Inc. Use of the Muriel API is governed
+by the terms at [murielai.io/terms](https://murielai.io/terms).

@@ -104,7 +104,7 @@ def test_out_of_credits_is_a_credits_error_with_the_server_message():
 
 
 def test_not_held_is_a_server_error():
-    NEXT["resp"] = _Resp(501, {"detail": "Violations are not in the store."})
+    NEXT["resp"] = _Resp(501, {"detail": "Violation records are not available yet."})
     try:
         muriel.get_violations(pwsid="IL0316000", api_key=KEY)
         raise AssertionError("expected MurielServerError")
