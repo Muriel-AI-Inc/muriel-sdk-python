@@ -156,6 +156,39 @@ def test_module_level_query_takes_an_api_key():
         agent_mod._agents.clear()
 
 
+def test_nested_model_and_a_wrapped_answer():
+    from typing import List, Optional
+
+    class Item(BaseModel):
+        analyte: str
+        limit: Optional[float]
+
+    class Report(BaseModel):
+        pwsid: str
+        items: List[Item]
+
+    wrapped = {"$parameter": {"pwsid": "IL0316000",
+                              "items": [{"analyte": "LEAD", "limit": None}]}}
+    a = _agent({"results": [wrapped], "count": 1, "summary": "s"})
+    r = a.query("x", schema=Report)
+    assert isinstance(r, Report) and r.items[0].analyte == "LEAD"
+    assert "$defs" in a._session.sent["schema"]          # sent as Pydantic emits it
+
+
+def test_an_answer_that_does_not_fit_the_model_says_so():
+    class Report(BaseModel):
+        pwsid: str
+        results_over_mcl: int
+
+    a = _agent({"results": [{"pwsid": "IL0316000"}], "count": 1, "summary": "s"})
+    try:
+        a.query("x", schema=Report)
+        raise AssertionError("expected MurielAPIError")
+    except MurielAPIError as e:
+        assert "did not fit Report" in str(e) and "results_over_mcl" in str(e)
+        assert e.response == {"pwsid": "IL0316000"}
+
+
 def test_out_of_credits_reports_the_balance():
     a = _agent()
     body = {"detail": {"error": "out_of_credits", "message": "You are out of credits.",

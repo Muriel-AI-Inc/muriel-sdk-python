@@ -10,7 +10,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar, Union
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .config import AGENT_TIMEOUT, checked_base_url, get_api_key, get_base_url
 from .exceptions import (
@@ -65,6 +65,17 @@ def _normalise_since(since: Union[str, date, datetime, None]) -> Optional[str]:
         raise MurielValidationError(
             f"since= must be a date or 'YYYY-MM-DD', got {since!r}."
         ) from None
+
+
+def _unwrap(obj: Any, schema: Dict[str, Any]) -> Any:
+    """Undo a wrapper object round a shaped answer ({"$parameter": {...}}):
+    one key that is not a field of the schema, holding an object."""
+    props = (schema or {}).get("properties") or {}
+    if isinstance(obj, dict) and len(obj) == 1:
+        (k, v), = obj.items()
+        if k not in props and isinstance(v, dict):
+            return v
+    return obj
 
 
 class Agent:
@@ -228,8 +239,19 @@ class Agent:
             # object, as the Pydantic path always has.
             results = data.get("results", [])
             first = results[0] if isinstance(results, list) and results else results
+            first = _unwrap(first, payload["schema"])
             if model is not None:
-                return model.model_validate(first)
+                try:
+                    return model.model_validate(first)
+                except ValidationError as exc:
+                    raise MurielAPIError(
+                        f"The answer did not fit {model.__name__}: "
+                        f"{exc.error_count()} field(s) wrong or missing "
+                        f"({', '.join(str(e['loc'][0]) for e in exc.errors()[:6] if e.get('loc'))}). "
+                        "Try again, make the fields Optional, or ask a narrower question. "
+                        "The raw answer is in .response.",
+                        response=first,
+                    ) from exc
             first = dict(first or {})
             if fields is not None:
                 missing = [f for f in fields if f not in first]
