@@ -291,6 +291,7 @@ agency can say whether a system is in compliance.
 - Guides and SDK reference: [docs.murielai.io](https://docs.murielai.io)
 - MCP connector reference: [murielai.io/developers](https://murielai.io/developers#connector)
 - REST API reference: [api.murielai.io/docs](https://api.murielai.io/docs)
+- JavaScript and TypeScript: `npm install @muriel-ai/sdk` ([github.com/Muriel-AI-Inc/muriel-sdk-js](https://github.com/Muriel-AI-Inc/muriel-sdk-js))
 
 ## Support
 
