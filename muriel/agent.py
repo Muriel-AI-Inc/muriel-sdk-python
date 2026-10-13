@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar, Union
 import requests
 from pydantic import BaseModel
 
-from .config import DEFAULT_TIMEOUT, checked_base_url, get_api_key, get_base_url
+from .config import AGENT_TIMEOUT, checked_base_url, get_api_key, get_base_url
 from .exceptions import (
     MurielAPIError,
     MurielAuthenticationError,
@@ -101,7 +101,7 @@ class Agent:
         self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        timeout: int = DEFAULT_TIMEOUT,
+        timeout: int = AGENT_TIMEOUT,
     ):
         """
         Initialise the Agent.
@@ -110,8 +110,9 @@ class Agent:
             api_key:  Muriel API key. Defaults to the ``MURIEL_API_KEY``
                       environment variable.
             base_url: Override the API base URL (default: https://api.murielai.io).
-            timeout:  HTTP timeout in seconds (default: 30). Agent queries
-                      can take several seconds — increase if you see timeouts.
+            timeout:  HTTP timeout in seconds (default: 120). An agent
+                      question typically takes 10-60 seconds; the server
+                      always answers within about 100.
         """
         self._api_key = api_key or get_api_key()
         if not self._api_key:
@@ -270,8 +271,9 @@ class Agent:
                                           allow_redirects=False)
         except requests.exceptions.Timeout:
             raise MurielAPIError(
-                f"Agent query timed out after {self._timeout}s. "
-                "Try increasing timeout= on the Agent constructor."
+                f"No answer within {self._timeout}s. The server answers within "
+                "about 100 seconds, so if you lowered timeout=, raise it; "
+                "otherwise try again or ask a narrower question."
             )
         except requests.exceptions.ConnectionError:
             raise MurielAPIError(f"Failed to connect to {self._base_url}")
@@ -310,6 +312,12 @@ class Agent:
                 detail_of(response, "Rate limit exceeded. Wait and retry."),
                 status_code=429,
                 response=response.json() if response.content else None,
+            )
+        elif response.status_code in (504, 524):
+            raise MurielServerError(
+                "The question took longer than one API call allows. Ask a narrower "
+                "question (one system, one contaminant or a date range) and retry.",
+                status_code=response.status_code,
             )
         elif response.status_code >= 500:
             raise MurielServerError(

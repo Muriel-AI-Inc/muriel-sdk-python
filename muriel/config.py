@@ -6,6 +6,9 @@ from urllib.parse import urlsplit
 # API Configuration
 DEFAULT_BASE_URL = "https://api.murielai.io"
 DEFAULT_TIMEOUT = 30
+# An agent question runs tools and a model, typically 10-60 seconds; the server
+# answers within about 100 seconds, so wait a little longer than that.
+AGENT_TIMEOUT = 120
 
 # Environment variable names
 ENV_API_KEY = "MURIEL_API_KEY"
