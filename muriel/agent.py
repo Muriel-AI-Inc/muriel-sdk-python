@@ -244,6 +244,7 @@ class Agent:
             results=data.get("results", []),
             count=data.get("count", 0),
             summary=data.get("summary", ""),
+            summary_markdown=data.get("summary_markdown"),
             execution_log=data.get("execution_log", []),
             warning=data.get("warning"),
             documents=data.get("documents") or [],

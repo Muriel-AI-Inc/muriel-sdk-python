@@ -119,7 +119,9 @@ class AgentQueryResponse(BaseModel):
 
     results: List[Dict[str, Any]] = Field(description="The records the agent's data tools returned")
     count: int = Field(description="len(results)")
-    summary: str = Field(description="The agent's answer in plain English")
+    summary: str = Field(description="The agent's answer in plain English, as plain text")
+    summary_markdown: Optional[str] = Field(
+        None, description="The same answer with its Markdown formatting, as the web app shows it")
     execution_log: List[Dict[str, Any]] = Field(
         default_factory=list, description="Each tool the agent ran, with its input")
     warning: Optional[str] = Field(None, description="Set when the answer needs a caveat")
