@@ -147,8 +147,9 @@ answer = muriel.query("Any new detections?", pwsid="IL0316000", since="2026-01-0
 
 ### Get exactly the fields you need
 
-Pass a list of field names, a JSON schema or a Pydantic model, and the answer
-comes back in that shape, ready for a database, a dashboard or another program:
+Pass a list of field names, a JSON schema, a Pydantic model or a list of them
+(`List[Model]`), and the answer comes back in that shape, ready for a database,
+a dashboard or another program:
 
 ```python
 latest = muriel.query(
@@ -171,6 +172,23 @@ class SystemSummary(BaseModel):
 
 summary = Agent().query("Summarize water quality for IL0316000.", schema=SystemSummary)
 print(summary.system_name, summary.total_samples)
+```
+
+```python
+from typing import List, Optional
+
+class Exceedance(BaseModel):
+    pwsid: str
+    system_name: str
+    analyte: str
+    concentration: float
+    units: str
+    mcl: Optional[float] = None
+    sample_date: str
+
+hits = Agent().query("Nitrate results above the MCL in Iowa this year.", schema=List[Exceedance])
+for h in hits:
+    print(h.system_name, h.concentration, h.units)
 ```
 
 ### From question to CSV

@@ -227,6 +227,48 @@ def test_every_error_status_raises_its_own_exception():
                 assert "server says" in str(e), f"{status}: server detail lost"
 
 
+class Alert(BaseModel):
+    pwsid: str
+    analyte: str
+    concentration: float
+
+
+ALERTS = [{"pwsid": "TX1010001", "analyte": "Nitrate", "concentration": 14.2},
+          {"pwsid": "TX2200012", "analyte": "Arsenic", "concentration": 0.031}]
+
+
+def test_a_list_of_models():
+    from typing import List
+    a = _agent({"results": [ALERTS], "count": 1, "summary": "s"})
+    got = a.query("Active exceedances in Texas", schema=List[Alert])
+    sent = a._session.sent["schema"]
+    assert sent["type"] == "array" and "Alert" in str(sent)
+    assert [x.pwsid for x in got] == ["TX1010001", "TX2200012"]
+    assert all(isinstance(x, Alert) for x in got)
+    # list[Alert], an answer wrapped in one key, and an empty answer
+    a = _agent({"results": [{"items": ALERTS}], "count": 1, "summary": "s"})
+    assert len(a.query("q", schema=list[Alert])) == 2
+    a = _agent({"results": [[]], "count": 1, "summary": "s"})
+    assert a.query("q", schema=List[Alert]) == []
+
+
+def test_a_list_that_does_not_fit_says_where():
+    from typing import List
+    a = _agent({"results": [[{"pwsid": "TX1", "analyte": "Nitrate"}]], "count": 1, "summary": "s"})
+    try:
+        a.query("q", schema=List[Alert])
+    except MurielAPIError as e:
+        assert "0.concentration" in str(e) and e.response == [{"pwsid": "TX1", "analyte": "Nitrate"}]
+    else:
+        raise AssertionError("expected MurielAPIError")
+
+
+def test_an_array_json_schema_returns_a_list():
+    a = _agent({"results": [ALERTS], "count": 1, "summary": "s"})
+    got = a.query("q", schema={"type": "array", "items": {"type": "object"}})
+    assert got == ALERTS
+
+
 if __name__ == "__main__":
     n = 0
     for name, fn in sorted(globals().items()):

@@ -7,10 +7,10 @@ happens server-side — users only need a Muriel API key.
 
 import re
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar, Union, get_origin
 
 import requests
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from .config import AGENT_TIMEOUT, checked_base_url, get_api_key, get_base_url
 from .exceptions import (
@@ -26,9 +26,10 @@ from .models import AgentQueryResponse
 
 T = TypeVar("T", bound=BaseModel)
 
-# What `schema=` accepts: a Pydantic model, a list of field names, or a JSON
-# Schema dict. The API only ever sees a JSON Schema dict.
-SchemaArg = Union[Type[BaseModel], Sequence[str], Dict[str, Any]]
+# What `schema=` accepts: a Pydantic model, a typed list of them
+# (List[Model] / list[Model]), a list of field names, or a JSON Schema dict.
+# The API only ever sees a JSON Schema dict.
+SchemaArg = Union[Type[BaseModel], Sequence[str], Dict[str, Any], Any]
 
 # Nine characters: a state code (or two digits for EPA-region tribal systems),
 # then seven characters that are nearly always digits.
@@ -168,7 +169,10 @@ class Agent:
                            ``["event_type", "num_events", "pwsid", "insight"]``
                            -- returns a plain ``dict`` with exactly those keys;
                          * a Pydantic model -- returns an instance of it;
-                         * a JSON Schema ``dict`` -- returns a plain ``dict``.
+                         * ``List[Model]`` (or ``list[Model]``) -- returns a
+                           list of instances, e.g. one per system;
+                         * a JSON Schema ``dict`` -- returns a plain ``dict``
+                           (a ``list`` for a schema of ``"type": "array"``).
             max_records: Cap on the number of records returned (default 1000,
                          max 10000).
 
@@ -216,9 +220,21 @@ class Agent:
             payload["since"] = since_iso
 
         model: Optional[Type[BaseModel]] = None
+        adapter: Optional[TypeAdapter] = None
         fields: Optional[List[str]] = None
         if schema is not None:
-            if isinstance(schema, type) and issubclass(schema, BaseModel):
+            # A typed shape such as List[Model] or list[Model]. Checked first:
+            # on Python 3.9-3.10 list[Model] passes isinstance(.., type) but
+            # is not a class issubclass() accepts.
+            if get_origin(schema) is not None:
+                try:
+                    adapter = TypeAdapter(schema)
+                    payload["schema"] = adapter.json_schema()
+                except Exception as exc:  # noqa: BLE001
+                    raise MurielValidationError(
+                        f"schema={schema!r} cannot be turned into a JSON Schema: {exc}"
+                    ) from None
+            elif isinstance(schema, type) and issubclass(schema, BaseModel):
                 model = schema
                 payload["schema"] = schema.model_json_schema()
             elif isinstance(schema, dict):
@@ -228,8 +244,8 @@ class Agent:
                 fields = list(payload["schema"]["required"])
             else:
                 raise MurielValidationError(
-                    "schema= must be a list of field names, a Pydantic model, "
-                    "or a JSON Schema dict."
+                    "schema= must be a Pydantic model, List[Model], a list of "
+                    "field names, or a JSON Schema dict."
                 )
 
         data = self._post("/api/v1/agent/query", payload)
@@ -240,6 +256,22 @@ class Agent:
             results = data.get("results", [])
             first = results[0] if isinstance(results, list) and results else results
             first = _unwrap(first, payload["schema"])
+            if adapter is not None:
+                # A list answer the model wrapped in one key ({"items": [...]}).
+                if (payload["schema"].get("type") == "array" and isinstance(first, dict)
+                        and len(first) == 1 and isinstance(next(iter(first.values())), list)):
+                    first = next(iter(first.values()))
+                try:
+                    return adapter.validate_python(first)
+                except ValidationError as exc:
+                    raise MurielAPIError(
+                        f"The answer did not fit {schema!r}: "
+                        f"{exc.error_count()} field(s) wrong or missing "
+                        f"({', '.join('.'.join(str(x) for x in e['loc']) for e in exc.errors()[:6] if e.get('loc'))}). "
+                        "Try again, make the fields Optional, or ask a narrower question. "
+                        "The raw answer is in .response.",
+                        response=first,
+                    ) from exc
             if model is not None:
                 try:
                     return model.model_validate(first)
@@ -252,6 +284,8 @@ class Agent:
                         "The raw answer is in .response.",
                         response=first,
                     ) from exc
+            if isinstance(first, list):
+                return first
             first = dict(first or {})
             if fields is not None:
                 missing = [f for f in fields if f not in first]
