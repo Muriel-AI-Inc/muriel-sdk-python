@@ -36,7 +36,7 @@ from .exceptions import (
     MurielCreditsError,
 )
 
-__version__ = "0.2.6"
+__version__ = "0.2.7"
 __all__ = [
     # Client
     "MurielClient",
