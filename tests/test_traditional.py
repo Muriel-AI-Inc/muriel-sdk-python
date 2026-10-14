@@ -175,6 +175,33 @@ def test_redirects_are_disabled_on_the_request():
     assert seen.get("allow_redirects") is False
 
 
+def test_systems_limit_none_pages_through_the_whole_state():
+    from muriel.endpoints import systems as sysmod
+    calls = []
+    total = 5
+
+    def paging(self, method, url, params=None, json=None, timeout=None, **kw):
+        p = dict(params or {})
+        calls.append(p)
+        lo, n = int(p["offset"]), int(p["limit"])
+        recs = [{"pwsid": f"IL{i:07d}"} for i in range(lo, min(lo + n, total))]
+        return _Resp(body={"state": "IL", "records": recs, "systems": [r["pwsid"] for r in recs],
+                           "system_count": len(recs), "total_systems": total,
+                           "has_more": lo + len(recs) < total})
+
+    real, old_page = requests.Session.request, sysmod.MAX_PAGE
+    requests.Session.request, sysmod.MAX_PAGE = paging, 2
+    try:
+        resp = muriel.get_systems(state="il", limit=None, api_key=KEY)
+        one = muriel.get_systems(state="IL", limit=2, offset=2, api_key=KEY)
+    finally:
+        requests.Session.request, sysmod.MAX_PAGE = real, old_page
+    assert [c["offset"] for c in calls[:3]] == [0, 2, 4] and len(calls) == 4
+    assert resp["system_count"] == resp["total_systems"] == 5
+    assert len(set(resp["systems"])) == 5 and resp["has_more"] is False and resp["limit"] is None
+    assert calls[-1] == {"limit": 2, "offset": 2} and one["system_count"] == 2
+
+
 if __name__ == "__main__":
     import sys
     failed = 0

@@ -207,7 +207,8 @@ rows = get_results(address="121 N LaSalle St, Chicago, IL", radius_miles=10)
 rows = get_lead(limit=50, detections_only=True)
 
 # Every water system in a state, with size and latest sample
-systems = get_systems(state="IL")
+# (limit=None pages through them all; resp["total_systems"] is the state's count)
+resp = get_systems(state="IL", limit=None)
 ```
 
 The same calls work from any language over HTTP:
@@ -228,7 +229,7 @@ current results.
 |---|---|
 | `get_results()` | Results by system, state, analyte group or address, with filters for dates, detections, concentration and analyte |
 | `get_latest()`, `get_lead()`, `get_pfas()`, `get_coliform()`, `get_nitrate()`, `get_dbps()`, `get_arsenic()`, `get_manganese()`, `get_vocs()` | The latest results for one contaminant, nationwide |
-| `get_systems()` | Water systems in a state |
+| `get_systems()` | Water systems in a state; `limit=None` for all of them, or page with `offset` |
 | `get_state_sampling_points()`, `get_sampling_point_geocoding()` | Sampling points with a location |
 | `get_state_facilities()`, `get_facility_geocoding()` | Facilities with a location, where states publish them |
 | `SamplesClient`, `SystemsClient` | The same calls as objects |

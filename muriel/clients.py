@@ -50,14 +50,17 @@ class SystemsClient(_BaseClient):
     def get_systems(
         self,
         state: str,
-        limit: int = 100,
+        limit: Optional[int] = 100,
+        offset: int = 0,
         system_princ: Optional[str] = None,
         system_statu: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Water systems in a state; limit=None returns every one."""
         return _get_systems(
             state=state,
             api_key=self.api_key,
             limit=limit,
+            offset=offset,
             system_princ=system_princ,
             system_statu=system_statu,
             base_url=self.base_url,
