@@ -23,7 +23,7 @@ All three draw on the same data and the same Muriel account and credits.
 
 ## What Muriel covers
 
-- **88 million+ results** from **32 states** and **63,000+ water systems**
+- **92 million+ results** from **33 states** and **63,000+ water systems**
 - **Current:** many states update daily, often within days of sampling
 - **Deep:** some states go back to the 1970s
 - **Every contaminant states test for:** lead and copper, PFAS, nitrate,
