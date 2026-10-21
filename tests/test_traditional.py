@@ -215,3 +215,76 @@ if __name__ == "__main__":
                 print("FAIL", name, repr(exc))
     print("\nALL TESTS PASS" if not failed else f"\n{failed} FAILED")
     sys.exit(1 if failed else 0)
+
+
+# ---- limit=None and limits over 1,000 page for you ------------------------
+
+def _paged(total, cap=None):
+    """A fake server holding `total` records that pages like the API: at most
+    1,000 a request, ordered, `pagination` on each response, and (for state
+    and area routes) an offset cap."""
+    def req(self, method, url, params=None, json=None, timeout=None, **kw):
+        p = dict(params or {})
+        SENT.append({"method": method, "url": url, "params": p, "key": self.headers.get("X-API-Key")})
+        off, lim = int(p.get("offset", 0)), int(p["limit"])
+        assert lim <= 1000, "the API rejects a limit over 1,000"
+        n = max(0, min(lim, total - off))
+        more = off + n < total
+        capped = cap is not None and more and off + lim >= cap
+        return _Resp(body={"records": [{"i": off + k} for k in range(n)],
+                           "pagination": {"has_more": more and not capped,
+                                          "offset_limit_reached": capped,
+                                          "max_offset": cap or 1_000_000}})
+    return req
+
+
+def _with(fake, fn):
+    saved = requests.Session.request
+    requests.Session.request = fake
+    try:
+        return fn()
+    finally:
+        requests.Session.request = saved
+
+
+def test_limit_none_returns_a_whole_system():
+    SENT.clear()
+    rows = _with(_paged(2_500), lambda: get_results(pwsid="IL0316000", limit=None, api_key=KEY))
+    assert len(rows) == 2_500 and [r["i"] for r in rows] == list(range(2_500))
+    assert [s["params"]["offset"] for s in SENT] == [0, 1000, 2000]
+    assert all(s["params"]["limit"] == 1000 for s in SENT)
+    assert all(s["url"].endswith("/api/v1/records/system/IL0316000") for s in SENT)
+
+
+def test_limit_left_out_is_still_ten():
+    SENT.clear()
+    rows = _with(_paged(2_500), lambda: get_results(pwsid="IL0316000", api_key=KEY))
+    assert len(rows) == 10 and len(SENT) == 1 and SENT[0]["params"]["limit"] == 10
+
+
+def test_a_limit_over_1000_is_fetched_in_pages_and_stops_there():
+    SENT.clear()
+    rows = _with(_paged(5_000), lambda: get_results(pwsid="IL0316000", limit=2_500, api_key=KEY))
+    assert len(rows) == 2_500
+    assert [(s["params"]["offset"], s["params"]["limit"]) for s in SENT] == [(0, 1000), (1000, 1000), (2000, 500)]
+
+
+def test_paging_starts_from_the_offset_given():
+    SENT.clear()
+    rows = _with(_paged(2_500), lambda: get_results(pwsid="IL0316000", limit=None, offset=1_500, api_key=KEY))
+    assert len(rows) == 1_000 and rows[0]["i"] == 1_500
+
+
+def test_a_state_query_stops_at_the_offset_cap_and_says_so():
+    import pytest
+    SENT.clear()
+    with pytest.warns(UserWarning, match="Stopped at 3,000 records"):
+        rows = _with(_paged(50_000, cap=3_000),
+                     lambda: get_results(state="IL", analyte="Lead", limit=None, api_key=KEY))
+    assert len(rows) == 3_000
+
+
+def test_limit_zero_is_refused():
+    import pytest
+    with pytest.raises(MurielValidationError):
+        get_results(pwsid="IL0316000", limit=0, api_key=KEY)
