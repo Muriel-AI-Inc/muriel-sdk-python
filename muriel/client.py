@@ -119,10 +119,15 @@ class MurielClient:
                     response=response.json() if response.content else None,
                 )
             elif response.status_code == 429:
+                try:
+                    retry_after = int(response.headers.get("Retry-After"))
+                except (TypeError, ValueError):
+                    retry_after = None
                 raise MurielRateLimitError(
                     detail_of(response, "Rate limit exceeded"),
                     status_code=response.status_code,
                     response=response.json() if response.content else None,
+                    retry_after=retry_after,
                 )
             elif response.status_code >= 500:
                 raise MurielServerError(

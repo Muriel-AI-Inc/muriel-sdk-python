@@ -65,9 +65,17 @@ class MurielCreditsError(MurielAPIError):
 
 
 class MurielRateLimitError(MurielAPIError):
-    """Raised when rate limit is exceeded."""
+    """HTTP 429: more than 60 requests in a minute on one key.
 
-    pass
+    Attributes:
+        retry_after: seconds to wait before retrying, from the response's
+            Retry-After header (None if the server did not send one).
+    """
+
+    def __init__(self, message: str = "Rate limit exceeded", status_code: int = 429,
+                 response: dict = None, retry_after: int = None):
+        self.retry_after = retry_after
+        super().__init__(message, status_code=status_code, response=response)
 
 
 class MurielServerError(MurielAPIError):

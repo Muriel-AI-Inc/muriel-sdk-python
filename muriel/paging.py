@@ -39,10 +39,11 @@ def _get(client: MurielClient, endpoint: str, params: Dict[str, Any]) -> Dict[st
     for attempt in range(RATE_LIMIT_TRIES):
         try:
             return client.get(endpoint, params=params)
-        except MurielRateLimitError:
+        except MurielRateLimitError as err:
             if attempt == RATE_LIMIT_TRIES - 1:
                 raise
-            time.sleep(RATE_LIMIT_WAIT)
+            time.sleep(RATE_LIMIT_WAIT if err.retry_after is None
+                       else min(err.retry_after, RATE_LIMIT_WAIT * 3))
     raise AssertionError("unreachable")
 
 

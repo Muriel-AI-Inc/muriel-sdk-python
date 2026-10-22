@@ -365,3 +365,15 @@ def test_a_feed_limit_of_zero_is_refused():
     import pytest
     with pytest.raises(MurielValidationError):
         get_lead(limit=0, api_key=KEY)
+
+
+def test_a_rate_limit_error_says_how_long_to_wait():
+    import pytest
+    from muriel import MurielRateLimitError
+    r = _Resp(429, {"detail": "Rate limit: 60 requests a minute per key. Wait and retry."})
+    r.headers = {"Retry-After": "20"}
+    NEXT["resp"] = r
+    with pytest.raises(MurielRateLimitError) as info:
+        get_results(pwsid="IL0316000", api_key=KEY)
+    assert info.value.retry_after == 20 and info.value.status_code == 429
+    NEXT["resp"] = _Resp()
