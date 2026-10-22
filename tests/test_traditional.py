@@ -288,3 +288,80 @@ def test_limit_zero_is_refused():
     import pytest
     with pytest.raises(MurielValidationError):
         get_results(pwsid="IL0316000", limit=0, api_key=KEY)
+
+
+# ---- contaminant feeds: every record by default, through the API's cursor ----
+
+def _cursor_feed(total, fail_once_at=None):
+    """A fake feed route that pages with pagination.next_cursor (the offset,
+    as a string) and, optionally, rate-limits one page once."""
+    state = {"failed": False}
+
+    def req(self, method, url, params=None, json=None, timeout=None, **kw):
+        p = dict(params or {})
+        SENT.append({"method": method, "url": url, "params": p, "key": self.headers.get("X-API-Key")})
+        at, lim = int(p.get("cursor", 0)), int(p["limit"])
+        assert lim <= 1000, "the API rejects a limit over 1,000"
+        if fail_once_at is not None and at == fail_once_at and not state["failed"]:
+            state["failed"] = True
+            return _Resp(429, {"detail": "Rate limit: 60 requests a minute per key."})
+        n = max(0, min(lim, total - at))
+        more = at + n < total
+        return _Resp(body={"records": [{"i": at + k} for k in range(n)],
+                           "pagination": {"has_more": more,
+                                          "next_cursor": str(at + n) if more else None}})
+    return req
+
+
+def test_a_feed_returns_every_record_when_no_limit_is_given():
+    SENT.clear()
+    rows = _with(_cursor_feed(2_500), lambda: get_lead(api_key=KEY))
+    assert [r["i"] for r in rows] == list(range(2_500))
+    assert [s["params"].get("cursor") for s in SENT] == [None, "1000", "2000"]
+    assert all(s["params"]["limit"] == 1000 and s["url"].endswith("/api/v1/records/lead") for s in SENT)
+
+
+def test_a_feed_with_limit_none_is_the_same():
+    SENT.clear()
+    rows = _with(_cursor_feed(1_200), lambda: get_lead(limit=None, api_key=KEY))
+    assert len(rows) == 1_200 and len(SENT) == 2
+
+
+def test_a_feed_limit_stops_there_and_filters_go_on_every_page():
+    SENT.clear()
+    rows = _with(_cursor_feed(5_000), lambda: get_lead(limit=1_500, min_concentration=0.015, api_key=KEY))
+    assert len(rows) == 1_500
+    assert [(s["params"].get("cursor"), s["params"]["limit"]) for s in SENT] == [(None, 1000), ("1000", 500)]
+    assert all(s["params"]["min_concentration"] == 0.015 for s in SENT)
+
+
+def test_a_rate_limited_page_is_retried_not_lost():
+    from muriel import paging
+    saved, paging.RATE_LIMIT_WAIT = paging.RATE_LIMIT_WAIT, 0
+    try:
+        SENT.clear()
+        rows = _with(_cursor_feed(2_500, fail_once_at=1000), lambda: muriel.get_pfas(api_key=KEY))
+    finally:
+        paging.RATE_LIMIT_WAIT = saved
+    assert len(rows) == 2_500 and len(SENT) == 4
+
+
+def test_an_older_server_without_a_cursor_gives_one_page_not_a_loop():
+    SENT.clear()
+    old = lambda self, method, url, params=None, **kw: (
+        SENT.append({"params": dict(params or {})}) or
+        _Resp(body={"records": [{"i": k} for k in range(1000)], "pagination": None}))
+    rows = _with(old, lambda: get_lead(api_key=KEY))
+    assert len(rows) == 1000 and len(SENT) == 1
+
+
+def test_an_analyte_group_query_follows_the_cursor():
+    SENT.clear()
+    rows = _with(_cursor_feed(2_100), lambda: get_results(analyte_group="pfas", limit=None, api_key=KEY))
+    assert len(rows) == 2_100 and SENT[-1]["url"].endswith("/api/v1/records/group/pfas")
+
+
+def test_a_feed_limit_of_zero_is_refused():
+    import pytest
+    with pytest.raises(MurielValidationError):
+        get_lead(limit=0, api_key=KEY)

@@ -1,10 +1,10 @@
 """Water quality sample results endpoints."""
 
-import warnings
 from typing import List, Optional, Dict, Any
 
 from ..client import MurielClient
 from ..exceptions import MurielValidationError
+from ..paging import PAGE_SIZE, fetch_pages
 from ..utils import (
     build_sort_param,
     extract_records,
@@ -12,8 +12,6 @@ from ..utils import (
     resolve_limit,
 )
 
-# The API returns at most this many records per request; larger requests page.
-PAGE_SIZE = 1000
 # Distinguishes limit=None ("everything") from limit left out (the default).
 _DEFAULT = object()
 
@@ -156,28 +154,4 @@ def get_results(
         if want is not None and want <= PAGE_SIZE:
             response = client.get(endpoint, params={**params, "limit": want})
             return extract_records(response)
-        return _all_pages(client, endpoint, params, want, offset)
-
-
-def _all_pages(client: MurielClient, endpoint: str, params: Dict[str, Any],
-               want: Optional[int], offset: int) -> List[Dict[str, Any]]:
-    """Up to `want` records (None: all), PAGE_SIZE at a time, from `offset`."""
-    out: List[Dict[str, Any]] = []
-    at = offset
-    while want is None or len(out) < want:
-        size = PAGE_SIZE if want is None else min(PAGE_SIZE, want - len(out))
-        response = client.get(endpoint, params={**params, "limit": size, "offset": at})
-        page = extract_records(response)
-        out.extend(page)
-        at += len(page)
-        pag = response.get("pagination") or {} if isinstance(response, dict) else {}
-        if pag.get("offset_limit_reached"):
-            warnings.warn(
-                f"Stopped at {len(out):,} records: the API pages state, analyte-group and "
-                f"address queries up to an offset of {pag.get('max_offset', 10_000):,}. "
-                "Narrow the query (start_date/end_date, analyte) or ask for one system "
-                "with pwsid=, which pages through its whole record.", stacklevel=3)
-            break
-        if not page or not pag.get("has_more", len(page) >= size):
-            break
-    return out
+        return fetch_pages(client, endpoint, params, want, offset)

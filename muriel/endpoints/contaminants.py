@@ -1,8 +1,16 @@
-"""Convenience functions for common contaminant queries."""
+"""Convenience functions for common contaminant queries.
+
+Each feed returns EVERY matching record unless ``limit`` is given: the SDK
+follows the API's cursor 1,000 records at a time. Nationwide feeds can be
+large -- narrow them (era, detections_only, min_concentration, geocoded_only)
+or pass a limit. ``get_latest`` is the exception: it returns the newest
+``limit`` results (default 10), since "all" would be the whole store.
+"""
 
 from typing import List, Optional, Dict, Any
 
 from ..client import MurielClient
+from ..paging import check_limit, fetch_pages
 
 
 def get_latest(
@@ -34,7 +42,7 @@ def get_latest(
 
 
 def get_lead(
-    limit: int = 100,
+    limit: Optional[int] = None,
     detections_only: bool = False,
     min_concentration: Optional[float] = None,
     geocoded_only: bool = False,
@@ -46,7 +54,8 @@ def get_lead(
     Get lead test results globally.
 
     Args:
-        limit: Number of results to return (default: 100, max: 1000)
+        limit: Maximum records to return. Left out (None): every matching
+                record, fetched 1,000 at a time (1 credit per 1,000 records)
         detections_only: Only return detected results (value > 0)
         min_concentration: Minimum concentration (e.g., 0.015 for EPA action level)
         geocoded_only: Only return records with coordinates
@@ -67,7 +76,7 @@ def get_lead(
         client_kwargs["base_url"] = base_url
 
     with MurielClient(**client_kwargs) as client:
-        params = {"limit": limit}
+        params: Dict[str, Any] = {}
         if detections_only:
             params["detections_only"] = True
         if min_concentration is not None:
@@ -77,12 +86,11 @@ def get_lead(
 
         if era:
             params["era"] = era
-        response = client.get("/api/v1/records/lead", params=params)
-        return response.get("records", [])
+        return fetch_pages(client, "/api/v1/records/lead", params, check_limit(limit))
 
 
 def get_pfas(
-    limit: int = 100,
+    limit: Optional[int] = None,
     detections_only: bool = False,
     min_concentration: Optional[float] = None,
     result_analyte_name: Optional[str] = None,
@@ -95,9 +103,10 @@ def get_pfas(
     Get PFAS (forever chemicals) test results globally.
 
     Args:
-        limit: Number of results to return (default: 100, max: 1000)
+        limit: Maximum records to return. Left out (None): every matching
+                record, fetched 1,000 at a time (1 credit per 1,000 records)
         detections_only: Only return detected results (value > 0)
-        min_concentration: Minimum concentration (e.g., 0.004 for EPA advisory)
+        min_concentration: Minimum concentration in mg/L (4 ppt is 0.000004)
         result_analyte_name: Filter by specific PFAS (e.g., 'PERFLUOROCTANOIC ACID (PFOA)')
         geocoded_only: Only return records with coordinates
         api_key: Your Muriel API key
@@ -109,8 +118,8 @@ def get_pfas(
         List of PFAS test records
 
     Example:
-        >>> # Get PFAS above EPA health advisory (4 ppt = 0.004 ug/L)
-        >>> records = get_pfas(min_concentration=0.004, api_key='YOUR_API_KEY')
+        >>> # PFAS at or above 4 ppt (0.004 ug/L = 0.000004 mg/L)
+        >>> records = get_pfas(min_concentration=0.000004, api_key='YOUR_API_KEY')
 
         >>> # Get only PFOA tests
         >>> pfoa = get_pfas(result_analyte_name='PERFLUOROCTANOIC ACID (PFOA)', api_key='YOUR_API_KEY')
@@ -120,7 +129,7 @@ def get_pfas(
         client_kwargs["base_url"] = base_url
 
     with MurielClient(**client_kwargs) as client:
-        params = {"limit": limit}
+        params: Dict[str, Any] = {}
         if detections_only:
             params["detections_only"] = True
         if min_concentration is not None:
@@ -132,12 +141,11 @@ def get_pfas(
 
         if era:
             params["era"] = era
-        response = client.get("/api/v1/records/pfas", params=params)
-        return response.get("records", [])
+        return fetch_pages(client, "/api/v1/records/pfas", params, check_limit(limit))
 
 
 def get_coliform(
-    limit: int = 100,
+    limit: Optional[int] = None,
     presence_indicator: Optional[str] = None,
     geocoded_only: bool = False,
     api_key: Optional[str] = None,
@@ -148,7 +156,8 @@ def get_coliform(
     Get coliform (TCR) and E. coli test results globally.
 
     Args:
-        limit: Number of results to return (default: 100, max: 1000)
+        limit: Maximum records to return. Left out (None): every matching
+                record, fetched 1,000 at a time (1 credit per 1,000 records)
         presence_indicator: Filter by presence ('P' = detected, 'A' = not detected)
         geocoded_only: Only return records with coordinates
         api_key: Your Muriel API key
@@ -171,7 +180,7 @@ def get_coliform(
         client_kwargs["base_url"] = base_url
 
     with MurielClient(**client_kwargs) as client:
-        params = {"limit": limit}
+        params: Dict[str, Any] = {}
         if presence_indicator:
             params["presence_indicator"] = presence_indicator
         if geocoded_only:
@@ -179,12 +188,11 @@ def get_coliform(
 
         if era:
             params["era"] = era
-        response = client.get("/api/v1/records/coliform", params=params)
-        return response.get("records", [])
+        return fetch_pages(client, "/api/v1/records/coliform", params, check_limit(limit))
 
 
 def get_nitrate(
-    limit: int = 100,
+    limit: Optional[int] = None,
     detections_only: bool = False,
     min_concentration: Optional[float] = None,
     geocoded_only: bool = False,
@@ -196,7 +204,8 @@ def get_nitrate(
     Get nitrate and nitrate-nitrite test results globally.
 
     Args:
-        limit: Number of results to return (default: 100, max: 1000)
+        limit: Maximum records to return. Left out (None): every matching
+                record, fetched 1,000 at a time (1 credit per 1,000 records)
         detections_only: Only return detected results (value > 0)
         min_concentration: Minimum concentration (e.g., 10 for EPA MCL)
         geocoded_only: Only return records with coordinates
@@ -217,7 +226,7 @@ def get_nitrate(
         client_kwargs["base_url"] = base_url
 
     with MurielClient(**client_kwargs) as client:
-        params = {"limit": limit}
+        params: Dict[str, Any] = {}
         if detections_only:
             params["detections_only"] = True
         if min_concentration is not None:
@@ -227,12 +236,11 @@ def get_nitrate(
 
         if era:
             params["era"] = era
-        response = client.get("/api/v1/records/nitrate", params=params)
-        return response.get("records", [])
+        return fetch_pages(client, "/api/v1/records/nitrate", params, check_limit(limit))
 
 
 def get_dbps(
-    limit: int = 100,
+    limit: Optional[int] = None,
     detections_only: bool = False,
     min_concentration: Optional[float] = None,
     result_analyte_name: Optional[str] = None,
@@ -245,7 +253,8 @@ def get_dbps(
     Get disinfection by-products (DBPs) test results globally.
 
     Args:
-        limit: Number of results to return (default: 100, max: 1000)
+        limit: Maximum records to return. Left out (None): every matching
+                record, fetched 1,000 at a time (1 credit per 1,000 records)
         detections_only: Only return detected results (value > 0)
         min_concentration: Minimum concentration
         result_analyte_name: Filter by specific DBP (e.g., 'TTHM', 'HAA5')
@@ -270,7 +279,7 @@ def get_dbps(
         client_kwargs["base_url"] = base_url
 
     with MurielClient(**client_kwargs) as client:
-        params = {"limit": limit}
+        params: Dict[str, Any] = {}
         if detections_only:
             params["detections_only"] = True
         if min_concentration is not None:
@@ -282,12 +291,11 @@ def get_dbps(
 
         if era:
             params["era"] = era
-        response = client.get("/api/v1/records/dbps", params=params)
-        return response.get("records", [])
+        return fetch_pages(client, "/api/v1/records/dbps", params, check_limit(limit))
 
 
 def get_arsenic(
-    limit: int = 100,
+    limit: Optional[int] = None,
     detections_only: bool = False,
     min_concentration: Optional[float] = None,
     geocoded_only: bool = False,
@@ -299,7 +307,8 @@ def get_arsenic(
     Get arsenic test results globally.
 
     Args:
-        limit: Number of results to return (default: 100, max: 1000)
+        limit: Maximum records to return. Left out (None): every matching
+                record, fetched 1,000 at a time (1 credit per 1,000 records)
         detections_only: Only return detected results (value > 0)
         min_concentration: Minimum concentration (e.g., 0.010 for EPA MCL)
         geocoded_only: Only return records with coordinates
@@ -320,7 +329,7 @@ def get_arsenic(
         client_kwargs["base_url"] = base_url
 
     with MurielClient(**client_kwargs) as client:
-        params = {"limit": limit}
+        params: Dict[str, Any] = {}
         if detections_only:
             params["detections_only"] = True
         if min_concentration is not None:
@@ -330,12 +339,11 @@ def get_arsenic(
 
         if era:
             params["era"] = era
-        response = client.get("/api/v1/records/arsenic", params=params)
-        return response.get("records", [])
+        return fetch_pages(client, "/api/v1/records/arsenic", params, check_limit(limit))
 
 
 def get_manganese(
-    limit: int = 100,
+    limit: Optional[int] = None,
     detections_only: bool = False,
     min_concentration: Optional[float] = None,
     geocoded_only: bool = False,
@@ -347,7 +355,8 @@ def get_manganese(
     Get manganese test results globally.
 
     Args:
-        limit: Number of results to return (default: 100, max: 1000)
+        limit: Maximum records to return. Left out (None): every matching
+                record, fetched 1,000 at a time (1 credit per 1,000 records)
         detections_only: Only return detected results (value > 0)
         min_concentration: Minimum concentration (e.g., 0.05 for EPA secondary MCL)
         geocoded_only: Only return records with coordinates
@@ -368,7 +377,7 @@ def get_manganese(
         client_kwargs["base_url"] = base_url
 
     with MurielClient(**client_kwargs) as client:
-        params = {"limit": limit}
+        params: Dict[str, Any] = {}
         if detections_only:
             params["detections_only"] = True
         if min_concentration is not None:
@@ -378,12 +387,11 @@ def get_manganese(
 
         if era:
             params["era"] = era
-        response = client.get("/api/v1/records/manganese", params=params)
-        return response.get("records", [])
+        return fetch_pages(client, "/api/v1/records/manganese", params, check_limit(limit))
 
 
 def get_vocs(
-    limit: int = 100,
+    limit: Optional[int] = None,
     detections_only: bool = False,
     min_concentration: Optional[float] = None,
     result_analyte_name: Optional[str] = None,
@@ -396,7 +404,8 @@ def get_vocs(
     Get volatile organic compounds (VOCs) test results globally.
 
     Args:
-        limit: Number of results to return (default: 100, max: 1000)
+        limit: Maximum records to return. Left out (None): every matching
+                record, fetched 1,000 at a time (1 credit per 1,000 records)
         detections_only: Only return detected results (value > 0)
         min_concentration: Minimum concentration
         result_analyte_name: Filter by specific VOC (e.g., 'BENZENE', 'TOLUENE')
@@ -421,7 +430,7 @@ def get_vocs(
         client_kwargs["base_url"] = base_url
 
     with MurielClient(**client_kwargs) as client:
-        params = {"limit": limit}
+        params: Dict[str, Any] = {}
         if detections_only:
             params["detections_only"] = True
         if min_concentration is not None:
@@ -433,5 +442,4 @@ def get_vocs(
 
         if era:
             params["era"] = era
-        response = client.get("/api/v1/records/vocs", params=params)
-        return response.get("records", [])
+        return fetch_pages(client, "/api/v1/records/vocs", params, check_limit(limit))
