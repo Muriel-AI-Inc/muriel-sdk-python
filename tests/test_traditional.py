@@ -37,7 +37,8 @@ NEXT = {"resp": _Resp()}
 
 def _request(self, method, url, params=None, json=None, timeout=None, **kw):
     SENT.append({"method": method, "url": url, "params": dict(params or {}),
-                 "key": self.headers.get("X-API-Key")})
+                 "key": self.headers.get("X-API-Key"),
+                 "user_agent": self.headers.get("User-Agent")})
     return NEXT["resp"]
 
 
@@ -377,3 +378,9 @@ def test_a_rate_limit_error_says_how_long_to_wait():
         get_results(pwsid="IL0316000", api_key=KEY)
     assert info.value.retry_after == 20 and info.value.status_code == 429
     NEXT["resp"] = _Resp()
+
+
+def test_requests_say_they_come_from_this_package():
+    SystemsClient(api_key=KEY).get_systems(state="DE")
+    ua = _last()["user_agent"]
+    assert ua.startswith(f"muriel-python/{muriel.__version__} python/"), ua

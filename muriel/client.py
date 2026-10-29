@@ -1,5 +1,6 @@
 """Core client for the Muriel API."""
 
+import platform
 from typing import Any, Dict, Optional
 import requests
 
@@ -14,6 +15,14 @@ from .exceptions import (
     MurielCreditsError,
     detail_of,
 )
+
+
+def user_agent() -> str:
+    """`muriel-python/<version> python/<x.y.z>`: lets the API count calls made
+    with this package (as `muriel-js/<version>` does for the JavaScript SDK),
+    rather than lumping them in with every other Python script."""
+    from . import __version__  # here, not at the top: the package imports this module
+    return f"muriel-python/{__version__} python/{platform.python_version()}"
 
 
 class MurielClient:
@@ -42,7 +51,8 @@ class MurielClient:
         self.base_url = checked_base_url(base_url or get_base_url())
         self.timeout = timeout
         self.session = requests.Session()
-        self.session.headers.update({"X-API-Key": self.api_key})
+        self.session.headers.update({"X-API-Key": self.api_key,
+                                     "User-Agent": user_agent()})
 
     def _make_request(
         self,
